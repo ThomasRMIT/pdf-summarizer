@@ -12,7 +12,7 @@ from packaging import version
 import re
 import requests
 
-CURRENT_VERSION = "1.0.12"
+CURRENT_VERSION = "1.0.13"
 GITHUB_REPO = "ThomasRMIT/pdf-summarizer"
 
 def check_for_update():
