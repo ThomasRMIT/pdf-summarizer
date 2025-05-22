@@ -8,21 +8,24 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.units import inch
+from packaging import version
 import re
 import requests
 
-CURRENT_VERSION = "1.0.11"
+CURRENT_VERSION = "1.0.12"
 GITHUB_REPO = "ThomasRMIT/pdf-summarizer"
 
 def check_for_update():
     try:
-        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-        response = requests.get(api_url)
+        headers = {"Authorization": "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"}
+        response = requests.get(
+            "https://api.github.com/repos/ThomasRMIT/pdf-summarizer/releases/latest",
+            headers=headers
+        )
         response.raise_for_status()
-
         latest_version = response.json()["tag_name"].lstrip("v")
 
-        if latest_version > CURRENT_VERSION:
+        if version.parse(latest_version) > version.parse(CURRENT_VERSION):
             return True, latest_version, response.json()["html_url"]
         return False, latest_version, ""
     except Exception as e:
