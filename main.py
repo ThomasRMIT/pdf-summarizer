@@ -9,6 +9,25 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.units import inch
 import re
+import requests
+
+CURRENT_VERSION = "1.0.1"
+GITHUB_REPO = "ThomasRMIT/pdf-summarizer"
+
+def check_for_update():
+    try:
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        response = requests.get(api_url)
+        response.raise_for_status()
+
+        latest_version = response.json()["tag_name"].lstrip("v")
+
+        if latest_version > CURRENT_VERSION:
+            return True, latest_version, response.json()["html_url"]
+        return False, latest_version, ""
+    except Exception as e:
+        print(f"[ERROR] Failed to check for updates: {e}")
+        return False, "", ""
 
 def extract_text_from_pdf(file_path):
     doc = fitz.open(file_path)
@@ -202,4 +221,10 @@ model_menu.place(relx=0.82, rely=0.04)
 status_label = tk.Label(app, text="", font=("Helvetica", 10), fg="gray")
 status_label.pack(pady=5)
 
+is_update, latest_version, release_url = check_for_update()
+if is_update:
+    if messagebox.askyesno("Update Available", f"A new version (v{latest_version}) is available. Do you want to download it?"):
+        import webbrowser
+        webbrowser.open(release_url)
+        
 app.mainloop()
