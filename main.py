@@ -11,7 +11,7 @@ from reportlab.lib.units import inch
 import re
 import requests
 
-CURRENT_VERSION = "1.0.6"
+CURRENT_VERSION = "1.0.10"
 GITHUB_REPO = "ThomasRMIT/pdf-summarizer"
 
 def check_for_update():
@@ -192,7 +192,7 @@ num_ctx = 8192
 
 app = TkinterDnD.Tk()
 app.title("PDF Summarizer")
-app.geometry("500x300")
+app.geometry("550x350")
 
 label = tk.Label(app, text="Drag and drop a PDF here,\nor click the button to select one.", font=("Helvetica", 14))
 label.pack(pady=50)
@@ -211,11 +211,11 @@ browse_button.pack(pady=20)
 model_var = tk.StringVar(value="gemma3:4b")  # Default model
 
 model_label = tk.Label(app, text="Model:", font=("Helvetica", 10))
-model_label.place(relx=0.75, rely=0.05)
+model_label.place(relx=0.71, rely=0.05)
 
 
 model_menu = tk.OptionMenu(app, model_var, "gemma3:1b", "gemma3:4b", "gemma3:12b")
-model_menu.place(relx=0.82, rely=0.04)
+model_menu.place(relx=0.79, rely=0.04)
 
 # Status label
 status_label = tk.Label(app, text="", font=("Helvetica", 10), fg="gray")
