@@ -11,7 +11,7 @@ from reportlab.lib.units import inch
 import re
 import requests
 
-CURRENT_VERSION = "1.0.10"
+CURRENT_VERSION = "1.0.11"
 GITHUB_REPO = "ThomasRMIT/pdf-summarizer"
 
 def check_for_update():
