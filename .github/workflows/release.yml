@@ -63,7 +63,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           files: |
-            artifacts/windows-latest-build/app-windows.exe
-            artifacts/macos-latest-build/app-macos
+            artifacts/Windows-build/app-windows.exe
+            artifacts/macOS-build/app-macos
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
