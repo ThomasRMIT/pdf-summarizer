@@ -31,15 +31,25 @@ jobs:
         run: |
           pyinstaller --noconfirm --windowed --onefile main.py
 
+      - name: Rename build outputs
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            mv dist/main.exe dist/app-windows.exe
+          else
+            mv dist/main dist/app-macos
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-build
-          path: dist/*
+          path: |
+            dist/app-*
 
   release:
     needs: build
     runs-on: ubuntu-latest
+
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -52,6 +62,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           files: |
-            artifacts/**/*
+            artifacts/windows-latest-build/app-windows.exe
+            artifacts/macos-latest-build/app-macos
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
