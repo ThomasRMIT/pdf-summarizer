@@ -33,11 +33,11 @@ jobs:
 
       - name: Rename build outputs
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            mv dist/main.exe dist/app-windows.exe
-          else
+          if ($env:RUNNER_OS -eq "Windows") {
+            Rename-Item -Path dist\main.exe -NewName app-windows.exe
+          } else {
             mv dist/main dist/app-macos
-          fi
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
