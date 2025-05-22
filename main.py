@@ -11,7 +11,7 @@ from reportlab.lib.units import inch
 import re
 import requests
 
-CURRENT_VERSION = "1.0.1"
+CURRENT_VERSION = "1.0.6"
 GITHUB_REPO = "ThomasRMIT/pdf-summarizer"
 
 def check_for_update():
@@ -226,5 +226,5 @@ if is_update:
     if messagebox.askyesno("Update Available", f"A new version (v{latest_version}) is available. Do you want to download it?"):
         import webbrowser
         webbrowser.open(release_url)
-        
+
 app.mainloop()
