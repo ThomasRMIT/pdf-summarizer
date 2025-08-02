@@ -1,236 +1,104 @@
-# === Standard Library Imports ===
-import os
-import re
-import time
-import tkinter as tk
-from tkinter import filedialog, messagebox
 
-# === Third-Party Library Imports ===
-import fitz
-from docx import Document
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-from docx.text.paragraph import Paragraph
+import tkinter as tk
+from tkinter import filedialog, scrolledtext, messagebox
 from ollama import chat
 from ollama import ChatResponse
-from reportlab.lib.enums import TA_LEFT
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.pdfgen import canvas
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem
-from tkinterdnd2 import TkinterDnD, DND_FILES
+import fitz  # PyMuPDF
+from docx import Document
+import os
 
-# === PDF Text Extraction ===
-def extract_text_from_pdf(file_path):
-    doc = fitz.open(file_path)
-    text = ''
-    for page in doc:
-        text += page.get_text()
-    return text
+class GPTChatUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("GPT Chatbot")
+        self.root.geometry("800x650")
 
-# === Word Document Injection ===
-def insert_paragraph_after(paragraph, text):
-    parent = paragraph._parent
-    new_para = parent.add_paragraph(text)
-    p = new_para._element
-    paragraph._element.addnext(p)
-    return new_para
+        self.model_var = tk.StringVar(value="gemma3:4b")
+        self.messages = []
 
-def insert_into_circumstances_section(template_path, output_path, ai_summary):
-    doc = Document(template_path)
+        self.create_widgets()
 
-    found_heading = False
-    summary_lines = ai_summary.strip().split("\n")
+    def create_widgets(self):
+        # Chat history display
+        self.chat_display = scrolledtext.ScrolledText(self.root, wrap=tk.WORD, state="disabled", font=("Consolas", 11))
+        self.chat_display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-    for i, para in enumerate(doc.paragraphs):
-        if para.text.strip().upper() == "CIRCUMSTANCES":
-            found_heading = True
-            for j in range(i + 1, len(doc.paragraphs)):
-                target = doc.paragraphs[j - 1]
-                if target.text.strip():
-                    print(f"Inserting after: {target.text}")
-                    target.text = summary_lines[0].strip()
-                    previous_para = target
-                    for line in summary_lines[1:]:
-                        new_para = insert_paragraph_after(previous_para, line.strip())
-                        previous_para = new_para
-                    break
-            break
+        # Input frame for both text and buttons
+        input_frame = tk.Frame(self.root)
+        input_frame.pack(fill=tk.X, padx=10, pady=5)
 
-    if not found_heading:
-        raise ValueError("Could not find 'CIRCUMSTANCES' section.")
+        self.prompt_entry = tk.Text(input_frame, height=3, wrap=tk.WORD, font=("Consolas", 11))
+        self.prompt_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-    doc.save(output_path)
+        send_button = tk.Button(input_frame, text="Send", command=self.send_message)
+        send_button.pack(side=tk.RIGHT, padx=5)
 
-# === AI Summarization ===
-def summarize_text(text, model, num_ctx=8192, temperature=0.0):
-    response: ChatResponse = chat(
-        model=model,
-        messages=[{
-            'role': 'user',
-            'content': f'''
-                
-Please read through the following witness statement and generate only the following two sections of a Circumstances Report:
+        file_button = tk.Button(input_frame, text="📄 Add File", command=self.import_file)
+        file_button.pack(side=tk.RIGHT, padx=5)
 
-1. Description of Events (Chronological)
-List the events in the order they occurred, grouped by date when possible. Use subheadings for specific dates (e.g., “25 March 2025”) and describe what happened factually on that day. Only include events directly related to the incident and its immediate aftermath.
+        # Model selection
+        model_frame = tk.Frame(self.root)
+        model_frame.pack(pady=5)
+        tk.Label(model_frame, text="Model:").pack(side=tk.LEFT)
+        tk.OptionMenu(model_frame, self.model_var, "gemma3:1b", "gemma3:4b", "gemma3:12b").pack(side=tk.LEFT)
 
-2. Post-Incident Condition
-Summarize the individual's condition following the incident, including medication taken, time off work, return-to-work status, and any ongoing issues, based only on the statement provided.
+    def send_message(self, content_override=None):
+        user_input = content_override or self.prompt_entry.get("1.0", tk.END).strip()
+        if not user_input:
+            return
 
-Do not include opinions, assumptions, or inferred information. Only include information explicitly stated in the witness statement.
+        self.append_chat("You", user_input)
+        self.prompt_entry.delete("1.0", tk.END)
 
-:\n\n{text}'''
-        }],
-        options={
-            'num_ctx': num_ctx,
-            'temperature': temperature
-        }
-    )
-    return response.message.content
+        self.messages.append({"role": "user", "content": user_input})
+        try:
+            response: ChatResponse = chat(
+                model=self.model_var.get(),
+                messages=self.messages
+            )
+            reply = response.message.content.strip()
+            self.messages.append({"role": "assistant", "content": reply})
+            self.append_chat("Bot", reply)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
-def clean_summary_text(text):
-    text = re.sub(r"(?i)^here(?:'s| is) a summary.*?:\s*", "", text, count=1)
-    text = re.split(r"\n+(do you want me to.*|let me know if.*)", text, flags=re.IGNORECASE)[0]
-    return text.strip()
+    def append_chat(self, speaker, message):
+        self.chat_display.configure(state="normal")
+        self.chat_display.insert(tk.END, f"{speaker}: {message}\n\n")
+        self.chat_display.configure(state="disabled")
+        self.chat_display.see(tk.END)
 
-def extract_title_from_summary(text):
-    match = re.search(r'\*\*(.+?)\*\*', text)
-    if match:
-        title = match.group(1)
-        title = re.sub(r'[\\/:"*?<>|]+', '', title).strip()
-        return title
-    return "summary_report"
+    def import_file(self):
+        file_path = filedialog.askopenfilename(filetypes=[("PDF and Word files", "*.pdf *.docx")])
+        if not file_path:
+            return
 
-# === PDF Summary Output ===
-def write_summary_to_pdf(summary_text, output_path):
-    doc = SimpleDocTemplate(output_path)
-    styles = getSampleStyleSheet()
+        try:
+            if file_path.lower().endswith(".pdf"):
+                text = self.extract_text_from_pdf(file_path)
+            elif file_path.lower().endswith(".docx"):
+                text = self.extract_text_from_docx(file_path)
+            else:
+                raise ValueError("Unsupported file type.")
 
-    paragraph_style = styles["BodyText"]
-    bullet_style = ParagraphStyle(
-        name="Bullet",
-        parent=styles["Normal"],
-        leftIndent=20,
-        bulletIndent=10,
-        spaceBefore=4,
-    )
-    heading_style = ParagraphStyle(
-        name="Heading",
-        parent=styles["Heading2"],
-        spaceAfter=6,
-    )
+            # Insert file content into the prompt box so user can edit before sending
+            self.prompt_entry.insert(tk.END, text.strip() + "\n")
 
-    elements = []
+        except Exception as e:
+            messagebox.showerror("File Error", str(e))
 
-    def format_markdown(text):
-        text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
-        text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
-        return text
+    def extract_text_from_pdf(self, file_path):
+        doc = fitz.open(file_path)
+        text = ""
+        for page in doc:
+            text += page.get_text()
+        return text.strip()
 
-    lines = summary_text.strip().split('\n')
-    buffer = []
+    def extract_text_from_docx(self, file_path):
+        doc = Document(file_path)
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
 
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            if buffer:
-                combined = format_markdown(' '.join(buffer))
-                elements.append(Paragraph(combined, paragraph_style))
-                elements.append(Spacer(1, 0.15 * inch))
-                buffer = []
-            continue
-
-        if stripped.startswith("•"):
-            bullet_content = stripped[1:].strip()
-            bullet_formatted = format_markdown(bullet_content)
-            elements.append(ListFlowable(
-                [ListItem(Paragraph(bullet_formatted, bullet_style))],
-                bulletType='bullet'
-            ))
-            continue
-
-        if stripped.startswith("**") and stripped.endswith("**"):
-            heading = stripped.strip("*")
-            elements.append(Paragraph(f"<b>{heading}</b>", heading_style))
-            continue
-
-        buffer.append(stripped)
-
-    if buffer:
-        combined = format_markdown(' '.join(buffer))
-        elements.append(Paragraph(combined, paragraph_style))
-
-    doc.build(elements)
-
-# === Pipeline ===
-def process_pdf(pdf_path):
-    try:
-        pdf_text = extract_text_from_pdf(pdf_path)
-        selected_model = model_var.get()
-
-        start_time = time.time()
-        temperature = 0.0
-        summary = summarize_text(pdf_text, model=selected_model, num_ctx=num_ctx, temperature=temperature)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"[INFO] Model '{selected_model}' took {elapsed_time:.2f} seconds with temperature {temperature:.1f}.")
-
-        cleaned_summary = clean_summary_text(summary)
-        title = extract_title_from_summary(cleaned_summary)
-        output_dir = os.path.dirname(pdf_path)
-        output_file = os.path.join(output_dir, f"{title}.pdf")
-
-        write_summary_to_pdf(cleaned_summary, output_file)
-
-        template_path = "Proof - Report Template Blank.docx"
-        word_output_path = os.path.join(output_dir, f"{title}.docx")
-        insert_into_circumstances_section(template_path, word_output_path, cleaned_summary)
-
-        messagebox.showinfo("Success", f"Summary saved to:\n{output_file}")
-    except Exception as e:
-        messagebox.showerror("Error", str(e))
-
-# === GUI Callbacks ===
-def select_file():
-    file_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
-    if file_path:
-        process_pdf(file_path)
-
-def on_drop(event):
-    pdf_path = event.data.strip('{}')
-    if pdf_path.lower().endswith('.pdf'):
-        process_pdf(pdf_path)
-    else:
-        messagebox.showwarning("Invalid File", "Please drop a .pdf file.")
-
-# === GUI Setup ===
-num_ctx = 8192
-
-app = TkinterDnD.Tk()
-app.title("PDF Summarizer")
-app.geometry("550x350")
-
-label = tk.Label(app, text="Drag and drop a PDF here,\nor click the button to select one.", font=("Helvetica", 14))
-label.pack(pady=50)
-
-drop_area = tk.Label(app, text="⬇ Drop PDF File Here ⬇", relief="groove", height=5, width=50)
-drop_area.pack(pady=10)
-drop_area.drop_target_register(DND_FILES)
-drop_area.dnd_bind('<<Drop>>', on_drop)
-
-browse_button = tk.Button(app, text="Select PDF File", command=select_file)
-browse_button.pack(pady=20)
-
-model_var = tk.StringVar(value="gemma3:4b")
-
-model_label = tk.Label(app, text="Model:", font=("Helvetica", 10))
-model_label.place(relx=0.71, rely=0.05)
-
-model_menu = tk.OptionMenu(app, model_var, "gemma3:1b", "gemma3:4b", "gemma3:12b")
-model_menu.place(relx=0.79, rely=0.04)
-
-status_label = tk.Label(app, text="", font=("Helvetica", 10), fg="gray")
-status_label.pack(pady=5)
-
-app.mainloop()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = GPTChatUI(root)
+    root.mainloop()
