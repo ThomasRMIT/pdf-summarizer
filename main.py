@@ -10,7 +10,7 @@ import os
 class GPTChatUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("GPT Chatbot")
+        self.root.title("GPT Interface")
         self.root.geometry("800x650")
 
         self.model_var = tk.StringVar(value="gemma3:4b")
